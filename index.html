@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Signal City</title>
+<meta name="description" content="A living procedural city in 3D: traffic that obeys its signals, pedestrians, day and night, and weather.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="./src/ui/styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<!--@body-->
+<div id="viewport"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5.5" width="3.8" height="13" rx="1" fill="currentColor" stroke="none"/><rect x="13.7" y="5.5" width="3.8" height="13" rx="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.4"/><circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.2 18h9.6a3.9 3.9 0 0 0 .6-7.8 5.8 5.8 0 0 0-11.2 1.6A3.2 3.2 0 0 0 7.2 18z"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24"><path d="M7.2 14.5h9.6a3.9 3.9 0 0 0 .6-7.8 5.8 5.8 0 0 0-11.2 1.6 3.2 3.2 0 0 0 1 6.2z"/><path d="M9 17.5l-1 3M13 17.5l-1 3M17 17.5l-1 3"/></symbol>
+    <symbol id="i-storm" viewBox="0 0 24 24"><path d="M7.2 14h9.6a3.9 3.9 0 0 0 .6-7.8 5.8 5.8 0 0 0-11.2 1.6A3.2 3.2 0 0 0 7.2 14z"/><path d="M12.8 14l-2.6 3.6h3.4l-2.4 3.9"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 8.5h16M6 12.5h14M4 16.5h12"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 0 1 13.1-5"/><path d="M19.5 12a7.5 7.5 0 0 1-13.1 5"/><path d="M18 3.5V7h-3.5M6 20.5V17h3.5"/></symbol>
+    <symbol id="i-orbit" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="4.2"/><circle cx="12" cy="12" r="2.2"/></symbol>
+    <symbol id="i-tour" viewBox="0 0 24 24"><rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 10.5l5.5-3v9l-5.5-3"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M4 15.5l1.4-4.6A2.2 2.2 0 0 1 7.5 9.3h9a2.2 2.2 0 0 1 2.1 1.6L20 15.5v2.5H4z"/><circle cx="8" cy="15.5" r="1.2"/><circle cx="16" cy="15.5" r="1.2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></symbol>
+  </defs>
+</svg>
+
+<header class="hud hud-tl">
+  <div class="sign" role="group" aria-label="City sign">
+    <div class="sign-face">
+      <span class="sign-label">City of</span>
+      <strong class="sign-name" id="cityName">Signal City</strong>
+      <span class="sign-pop">Pop. <span id="cityPop">0</span></span>
+    </div>
+  </div>
+  <div class="clock" aria-live="off">
+    <svg class="clock-icon" id="skyIcon" aria-hidden="true"><use href="#i-sun"/></svg>
+    <div class="clock-body">
+      <div class="clock-time" id="clockTime">16:30</div>
+      <div class="clock-meta"><span id="clockDay">Monday · Day 1</span><span id="weatherLabel">Clear · 18°C</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="hud hud-tr stats" id="stats" aria-label="Live city statistics">
+  <button class="stats-head" id="statsToggle" aria-expanded="true" aria-controls="statsBody">
+    <span class="eyebrow">Traffic</span>
+    <span class="stats-quick"><span id="quickCars">0</span> cars · <span id="quickSpeed">0</span> km/h</span>
+    <span class="pill" id="flowPill" data-state="go">Moving</span>
+  </button>
+  <div class="stats-body" id="statsBody">
+    <dl class="stats-grid">
+      <div><dt>Vehicles</dt><dd id="statCars">0</dd></div>
+      <div><dt>Avg speed</dt><dd><span id="statSpeed">0</span><small>km/h</small></dd></div>
+      <div><dt>Stopped</dt><dd><span id="statStopped">0</span><small>%</small></dd></div>
+      <div><dt>On foot</dt><dd id="statPeds">0</dd></div>
+    </dl>
+    <canvas class="spark" id="spark" aria-label="Vehicles on the road over the last 24 simulated hours" role="img"></canvas>
+    <div class="spark-foot"><span>Vehicles · last 24 h</span><span id="fps">— fps</span></div>
+  </div>
+</section>
+
+<aside class="hud inspector" id="inspector" hidden aria-live="polite">
+  <header class="insp-head">
+    <div>
+      <span class="eyebrow" id="inspKind">Vehicle</span>
+      <h2 id="inspTitle">—</h2>
+      <p id="inspSub"></p>
+    </div>
+    <button class="icon-btn" id="inspClose" aria-label="Close details"><svg><use href="#i-close"/></svg></button>
+  </header>
+  <dl class="insp-rows" id="inspRows"></dl>
+  <div class="insp-actions" id="inspActions"></div>
+</aside>
+
+<nav class="hud dock" aria-label="Simulation controls">
+  <div class="dock-group">
+    <button class="icon-btn" id="playBtn" aria-label="Pause simulation" title="Pause (Space)"><svg><use href="#i-pause"/></svg></button>
+    <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
+      <button data-speed="1" aria-pressed="true">1×</button>
+      <button data-speed="2" aria-pressed="false">2×</button>
+      <button data-speed="4" aria-pressed="false">4×</button>
+      <button data-speed="8" aria-pressed="false">8×</button>
+    </div>
+  </div>
+  <div class="dock-group dock-time">
+    <label for="timeSlider" class="sr-only">Time of day</label>
+    <input type="range" id="timeSlider" min="0" max="1439" step="1" value="990">
+  </div>
+  <div class="dock-group">
+    <div class="seg" id="weatherSeg" role="group" aria-label="Weather">
+      <button data-weather="auto" aria-pressed="true" title="Changing weather"><svg><use href="#i-auto"/></svg><span class="sr-only">Changing weather</span></button>
+      <button data-weather="clear" aria-pressed="false" title="Clear"><svg><use href="#i-sun"/></svg><span class="sr-only">Clear</span></button>
+      <button data-weather="cloudy" aria-pressed="false" title="Cloudy"><svg><use href="#i-cloud"/></svg><span class="sr-only">Cloudy</span></button>
+      <button data-weather="rain" aria-pressed="false" title="Rain"><svg><use href="#i-rain"/></svg><span class="sr-only">Rain</span></button>
+      <button data-weather="storm" aria-pressed="false" title="Storm"><svg><use href="#i-storm"/></svg><span class="sr-only">Storm</span></button>
+      <button data-weather="fog" aria-pressed="false" title="Fog"><svg><use href="#i-fog"/></svg><span class="sr-only">Fog</span></button>
+    </div>
+  </div>
+  <div class="dock-group">
+    <div class="seg" id="camSeg" role="group" aria-label="Camera">
+      <button data-cam="orbit" aria-pressed="true" title="Free camera (Esc)"><svg><use href="#i-orbit"/></svg><span class="seg-label">Free</span></button>
+      <button data-cam="tour" aria-pressed="false" title="Aerial tour (T)"><svg><use href="#i-tour"/></svg><span class="seg-label">Tour</span></button>
+      <button data-cam="follow" aria-pressed="false" title="Follow a car (C)"><svg><use href="#i-car"/></svg><span class="seg-label">Follow</span></button>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="City settings" aria-expanded="false" aria-controls="drawer" title="City settings"><svg><use href="#i-sliders"/></svg></button>
+    <button class="icon-btn" id="helpBtn" aria-label="Controls and help" title="Controls (?)"><svg><use href="#i-help"/></svg></button>
+  </div>
+</nav>
+
+<aside class="hud drawer" id="drawer" hidden aria-label="City settings">
+  <header class="drawer-head">
+    <h2>City settings</h2>
+    <button class="icon-btn" id="drawerClose" aria-label="Close settings"><svg><use href="#i-close"/></svg></button>
+  </header>
+  <form id="cityForm" class="drawer-section">
+    <h3 class="eyebrow">New city</h3>
+    <label for="seedInput">Seed</label>
+    <div class="field-row">
+      <input id="seedInput" name="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
+      <button type="button" class="icon-btn" id="diceBtn" aria-label="Random seed" title="Random seed"><svg><use href="#i-dice"/></svg></button>
+    </div>
+    <fieldset class="size-pick">
+      <legend>Size</legend>
+      <label><input type="radio" name="size" value="small" id="sizeSmall"> <span>Small</span></label>
+      <label><input type="radio" name="size" value="medium" id="sizeMedium" checked> <span>Medium</span></label>
+      <label><input type="radio" name="size" value="large" id="sizeLarge"> <span>Large</span></label>
+    </fieldset>
+    <button type="submit" class="primary" id="buildBtn">Build city</button>
+    <p class="hint">The same seed always builds the same streets and skyline.</p>
+  </form>
+  <div class="drawer-section">
+    <h3 class="eyebrow">Simulation</h3>
+    <label for="trafficRange">Traffic <output id="trafficOut">100%</output></label>
+    <input type="range" id="trafficRange" min="0.2" max="1.6" step="0.05" value="1">
+    <label for="footRange">Pedestrians <output id="footOut">100%</output></label>
+    <input type="range" id="footRange" min="0.2" max="1.6" step="0.05" value="1">
+    <label for="dayLength">Length of a day</label>
+    <select id="dayLength">
+      <option value="360">6 minutes</option>
+      <option value="720" selected>12 minutes</option>
+      <option value="1440">24 minutes</option>
+      <option value="2880">48 minutes</option>
+    </select>
+  </div>
+  <div class="drawer-section">
+    <h3 class="eyebrow">Graphics</h3>
+    <label for="qualitySelect">Quality</label>
+    <select id="qualitySelect">
+      <option value="low">Low: no shadows or glow</option>
+      <option value="medium">Medium</option>
+      <option value="high">High: sharp shadows</option>
+    </select>
+  </div>
+</aside>
+
+<div class="modal" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="modal-card">
+    <header class="drawer-head">
+      <h2 id="helpTitle">Getting around</h2>
+      <button class="icon-btn" id="helpClose" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <div class="help-grid">
+      <section>
+        <h3 class="eyebrow">Mouse and touch</h3>
+        <ul>
+          <li><b>Drag</b> to orbit</li>
+          <li><b>Right-drag</b> or two fingers to pan</li>
+          <li><b>Scroll</b> or pinch to zoom</li>
+          <li><b>Click</b> a car, building or intersection to inspect it</li>
+        </ul>
+      </section>
+      <section>
+        <h3 class="eyebrow">Keyboard</h3>
+        <ul class="keys">
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> pan</li>
+          <li><kbd>Q</kbd><kbd>E</kbd> rotate · <kbd>R</kbd><kbd>F</kbd> zoom</li>
+          <li><kbd>Space</kbd> pause · <kbd>1</kbd>–<kbd>4</kbd> speed</li>
+          <li><kbd>T</kbd> tour · <kbd>C</kbd> follow a car · <kbd>V</kbd> driver's seat</li>
+          <li><kbd>Esc</kbd> free camera · <kbd>H</kbd> hide panels</li>
+        </ul>
+      </section>
+    </div>
+    <p class="help-note">Traffic signals cycle north–south, then east–west. Pedestrians cross with the green, turning cars wait for them, and left turns yield to oncoming traffic.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<div class="loader" id="loader">
+  <div class="loader-card">
+    <div class="sign sign-lg"><div class="sign-face"><span class="sign-label">Now building</span><strong class="sign-name" id="loaderName">Signal City</strong><span class="sign-pop" id="loaderStep">Surveying streets</span></div></div>
+  </div>
+</div>
+
+<noscript><p class="noscript">Signal City needs JavaScript and WebGL to run.</p></noscript>
+<!--@endbody-->
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
