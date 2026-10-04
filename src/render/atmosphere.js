@@ -108,9 +108,9 @@ const KEYS = [
   { e: -0.14, zenith: '#06102a', horizon: '#1d2643', sun: '#8aa4d6', sunI: 0, hemiSky: '#27355a', hemiGround: '#0b0d12', hemiI: 0.34, env: 0.26, exposure: 1.06 },
   { e: -0.05, zenith: '#16244e', horizon: '#9b5a5f', sun: '#ff6a3a', sunI: 0, hemiSky: '#46507a', hemiGround: '#1a1714', hemiI: 0.42, env: 0.38, exposure: 1.04 },
   { e: 0.02, zenith: '#33518e', horizon: '#f08a4c', sun: '#ff7f3a', sunI: 1.1, hemiSky: '#8d8fb0', hemiGround: '#2a2119', hemiI: 0.55, env: 0.6, exposure: 1.05 },
-  { e: 0.13, zenith: '#3c6bb0', horizon: '#f0be8a', sun: '#ffbe76', sunI: 2.3, hemiSky: '#a8bdd8', hemiGround: '#3a3123', hemiI: 0.7, env: 0.85, exposure: 1.0 },
-  { e: 0.35, zenith: '#3672c2', horizon: '#b5d0ea', sun: '#fff0da', sunI: 3.0, hemiSky: '#bcd2ec', hemiGround: '#4a4230', hemiI: 0.75, env: 1.0, exposure: 1.0 },
-  { e: 1.01, zenith: '#2c66b8', horizon: '#a6c8ea', sun: '#ffffff', sunI: 3.3, hemiSky: '#c4d8ef', hemiGround: '#50483a', hemiI: 0.8, env: 1.0, exposure: 1.0 },
+  { e: 0.13, zenith: '#3c6bb0', horizon: '#f0be8a', sun: '#ffbe76', sunI: 2.6, hemiSky: '#a8bdd8', hemiGround: '#3a3123', hemiI: 0.5, env: 0.62, exposure: 1.0 },
+  { e: 0.35, zenith: '#3672c2', horizon: '#b5d0ea', sun: '#fff0da', sunI: 3.4, hemiSky: '#bcd2ec', hemiGround: '#4a4230', hemiI: 0.48, env: 0.66, exposure: 1.0 },
+  { e: 1.01, zenith: '#2c66b8', horizon: '#a6c8ea', sun: '#ffffff', sunI: 3.6, hemiSky: '#c4d8ef', hemiGround: '#50483a', hemiI: 0.5, env: 0.68, exposure: 1.0 },
 ];
 const KEY_COLORS = ['zenith', 'horizon', 'sun', 'hemiSky', 'hemiGround'];
 for (const k of KEYS) for (const c of KEY_COLORS) k[c] = new THREE.Color(k[c]);
@@ -181,7 +181,8 @@ export class Atmosphere {
     this._moon = [0, 0, 0];
     this._key = {};
     this._tmp = new THREE.Color();
-    this.shadowSize = 2048;
+    this.shadowSize = 0;
+    this.setShadowQuality(2048, true);
   }
 
   setShadowQuality(size, enabled) {
@@ -261,7 +262,7 @@ export class Atmosphere {
     this.sun.intensity = lightI * Math.max(0.12, dim) * (1 - gloom * 0.5) + weather.flash * 2.5;
     if (sunUp) this.sun.color.copy(k.sun);
     else this.sun.color.setRGB(0.55, 0.65, 0.9);
-    this.state.dayLight = sunUp ? k.sunI / 3.3 : 0;
+    this.state.dayLight = sunUp ? k.sunI / 3.6 : 0;
 
     this.hemi.color.copy(k.hemiSky).lerp(grey, cloud * 0.5);
     this.hemi.groundColor.copy(k.hemiGround);

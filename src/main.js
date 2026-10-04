@@ -192,6 +192,11 @@ class App {
     this.stage.setQuality(q);
     const s = QUALITY[this.stage.quality];
     this.atmos.setShadowQuality(s.shadowSize, s.shadows);
+    // Shadow support is compiled into shaders, so rebuild them.
+    this.stage.scene.traverse((o) => {
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const m of mats) m.needsUpdate = true;
+    });
     if (this.views) {
       for (const m of this.views.trees.children) m.castShadow = s.treeShadows;
       this.views.effects.setViewport(this.stage.container.clientHeight, this.stage.pixelRatio, this.stage.camera.fov);

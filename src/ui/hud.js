@@ -32,8 +32,9 @@ export function savePrefs(prefs) {
 export class Hud {
   constructor(app) {
     this.app = app;
-    this.history = [];
-    this.lastSample = -1;
+    this.history = new Array(144).fill(null);
+    this.historyDay = -1;
+    this.historySlot = 0;
     this.tick = 0;
     this.fpsFrames = 0;
     this.fpsTime = 0;
@@ -145,8 +146,7 @@ export class Hud {
     $('cityName').textContent = world.city.name;
     $('cityPop').textContent = num.format(world.city.population);
     document.title = `${world.city.name} · Signal City`;
-    this.history = [];
-    this.lastSample = -1;
+    this.historyDay = -1;
   }
 
   showLoader(name, step) {
@@ -218,23 +218,28 @@ export class Hud {
     pill.textContent = state === 'go' ? 'Moving' : state === 'caution' ? 'Busy' : 'Congested';
     $('fps').textContent = `${Math.round(this.fps)} fps`;
 
-    // One sample every ten simulated minutes, 24 hours kept.
-    const slot = Math.floor((clock.day * 86400 + clock.seconds) / 600);
-    if (slot !== this.lastSample) {
-      this.lastSample = slot;
-      this.history.push(st.count);
-      if (this.history.length > 144) this.history.shift();
-      this.drawSpark();
+    // One sample per ten simulated minutes, for today only.
+    if (this.historyDay !== clock.day) {
+      this.historyDay = clock.day;
+      this.history = new Array(144).fill(null);
     }
+    const slot = Math.min(143, Math.floor(clock.seconds / 600));
+    // Rewinding the clock discards what was measured after the new time.
+    if (slot < this.historySlot) this.history.fill(null, slot + 1);
+    this.historySlot = slot;
+    this.history[slot] = st.count;
+    this.drawSpark();
     if (this.selection) this.renderInspector();
   }
 
+  /** Today's expected traffic (faint), what was measured so far (yellow), and a marker for now. */
   drawSpark() {
     const c = $('spark');
+    const w = this.app.world;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = c.clientWidth;
     const H = c.clientHeight;
-    if (!W || !H) return;
+    if (!W || !H || !w) return;
     if (c.width !== Math.round(W * dpr)) {
       c.width = Math.round(W * dpr);
       c.height = Math.round(H * dpr);
@@ -242,43 +247,77 @@ export class Hud {
     const ctx = c.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const data = this.history;
-    const max = Math.max(10, ...data) * 1.1;
     const css = getComputedStyle(document.documentElement);
     const lane = css.getPropertyValue('--lane').trim() || '#f2c230';
     const edge = css.getPropertyValue('--edge').trim();
+    const ink3 = css.getPropertyValue('--ink-3').trim();
+    const plan = [];
+    for (let i = 0; i <= 144; i++) plan.push(w.expectedCars(i / 6));
+    const max = Math.max(10, ...plan, ...this.history.filter((v) => v !== null)) * 1.08;
+    const x = (i) => (i / 144) * (W - 4) + 2;
+    const y = (v) => H - 12 - (v / max) * (H - 16);
+    // Grid: midnight, 6, noon, 18, midnight.
     ctx.strokeStyle = edge;
     ctx.lineWidth = 1;
-    for (const f of [0.33, 0.66]) {
+    ctx.fillStyle = ink3;
+    ctx.font = '9px "Overpass Mono", ui-monospace, monospace';
+    ctx.textBaseline = 'bottom';
+    for (const [h, label] of [[0, '00'], [6, '06'], [12, '12'], [18, '18'], [24, '24']]) {
+      const gx = Math.round(x(h * 6)) + 0.5;
       ctx.beginPath();
-      ctx.moveTo(0, Math.round(H * f) + 0.5);
-      ctx.lineTo(W, Math.round(H * f) + 0.5);
+      ctx.moveTo(gx, 2);
+      ctx.lineTo(gx, H - 12);
       ctx.stroke();
+      ctx.textAlign = h === 0 ? 'left' : h === 24 ? 'right' : 'center';
+      ctx.fillText(label, gx, H);
     }
-    if (data.length < 2) return;
-    const x = (i) => (i / 143) * (W - 6) + 2;
-    const y = (v) => H - 3 - (v / max) * (H - 8);
+    // Expected demand.
     ctx.beginPath();
-    ctx.moveTo(x(0), H);
-    data.forEach((v, i) => ctx.lineTo(x(i), y(v)));
-    ctx.lineTo(x(data.length - 1), H);
+    ctx.moveTo(x(0), H - 12);
+    plan.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+    ctx.lineTo(x(144), H - 12);
     ctx.closePath();
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, `${lane}55`);
-    grad.addColorStop(1, `${lane}00`);
-    ctx.fillStyle = grad;
+    ctx.fillStyle = 'rgba(154, 168, 182, 0.12)';
     ctx.fill();
     ctx.beginPath();
-    data.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
-    ctx.strokeStyle = lane;
-    ctx.lineWidth = 1.6;
+    plan.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
+    ctx.strokeStyle = 'rgba(154, 168, 182, 0.55)';
+    ctx.setLineDash([3, 3]);
     ctx.stroke();
-    const lx = x(data.length - 1);
-    const ly = y(data[data.length - 1]);
-    ctx.fillStyle = lane;
+    ctx.setLineDash([]);
+    // Measured so far today.
     ctx.beginPath();
-    ctx.arc(lx, ly, 3, 0, Math.PI * 2);
-    ctx.fill();
+    let started = false;
+    this.history.forEach((v, i) => {
+      if (v === null) {
+        started = false;
+        return;
+      }
+      if (started) ctx.lineTo(x(i), y(v));
+      else ctx.moveTo(x(i), y(v));
+      started = true;
+    });
+    const latest = this.history[this.historySlot];
+    const last = latest === null ? null : [this.historySlot, latest];
+    ctx.strokeStyle = lane;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    // Now.
+    const nowI = (w.clock.seconds / 86400) * 144;
+    ctx.strokeStyle = lane;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x(nowI)) + 0.5, 2);
+    ctx.lineTo(Math.round(x(nowI)) + 0.5, H - 12);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (last) {
+      ctx.fillStyle = lane;
+      ctx.beginPath();
+      ctx.arc(x(last[0]), y(last[1]), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // --- Inspector -------------------------------------------------------------------

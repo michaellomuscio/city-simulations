@@ -19,7 +19,6 @@
 </script>
 </head>
 <body>
-<!--@body-->
 <div id="viewport"></div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -75,8 +74,8 @@
       <div><dt>Stopped</dt><dd><span id="statStopped">0</span><small>%</small></dd></div>
       <div><dt>On foot</dt><dd id="statPeds">0</dd></div>
     </dl>
-    <canvas class="spark" id="spark" aria-label="Vehicles on the road over the last 24 simulated hours" role="img"></canvas>
-    <div class="spark-foot"><span>Vehicles · last 24 h</span><span id="fps">— fps</span></div>
+    <canvas class="spark" id="spark" aria-label="Vehicles on the road today: expected curve and measured counts" role="img"></canvas>
+    <div class="spark-foot"><span><i class="key key-actual"></i>Today <i class="key key-plan"></i>Expected</span><span id="fps">— fps</span></div>
   </div>
 </section>
 
@@ -214,7 +213,6 @@
 </div>
 
 <noscript><p class="noscript">Signal City needs JavaScript and WebGL to run.</p></noscript>
-<!--@endbody-->
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

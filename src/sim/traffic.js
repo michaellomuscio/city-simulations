@@ -33,6 +33,7 @@ const TURN_WEIGHTS = { straight: 0.55, right: 0.25, left: 0.2 };
 const LONG = 7; // vehicles longer than this swing wide through turns
 const CLAIM_AFTER = 2.5; // seconds blocked by crossing traffic before asking it to hold
 const LEFT_PATIENCE = 25; // seconds a left-turner yields before oncoming traffic lets it through
+const CLEAR_GRACE = 6; // seconds after its green ends that a waiting left-turner may still clear
 
 function removeCar(arr, c) {
   const i = arr.indexOf(c);
@@ -168,7 +169,6 @@ export class Traffic {
     return clamp(acc, -9, c.a);
   }
 
-  /** Leaders beyond the stop line: cars in the turn, cars merging into the same exit lane, the exit lane's tail. */
   /**
    * Follow cars on a turn that shares our starting lane, including ones whose tail is
    * still on it. `offset` converts their position along the turn into a gap from our front.
@@ -186,6 +186,7 @@ export class Traffic {
     return acc;
   }
 
+  /** Leaders beyond the stop line: cars in the turn, cars merging into the same exit lane, the exit lane's tail. */
   lookThrough(c, turn, dist, v0) {
     let acc = Infinity;
     for (const sib of turn.siblings) acc = Math.min(acc, this.followSibling(c, sib, dist, v0));
@@ -249,12 +250,11 @@ export class Traffic {
     const sig = I.signal;
     if (sig) {
       // Left-turners who waited through the green for a gap may clear on yellow, and with a
-      // claim also afterwards (crossing traffic holds for them), but never into the walk phase.
+      // claim for a few seconds after (crossing traffic holds for them).
       const clearing = turn.movement === 'left' && c.yieldWait > 1 && dist < 4;
       const st = sig.state(turn.approachSide);
       if (st === 'R') {
-        const pid = sig.phase.id;
-        const held = c.claim === turn && c.claimClearing && pid !== 'PED' && pid !== 'PED_CLEAR';
+        const held = c.claim === turn && c.claimClearing && this.time - c.claimAt < CLEAR_GRACE;
         if (!held && !(clearing && sig.clearing(turn.approachSide))) return WAIT.RED;
       }
       if (st === 'Y') {
@@ -329,11 +329,11 @@ export class Traffic {
     if (front) {
       const sig = turn.inter.signal;
       const st = sig ? sig.state(turn.approachSide) : 'G';
-      const pid = sig ? sig.phase.id : '';
       const endOfGreen = st === 'Y' || (sig && sig.clearing(turn.approachSide));
+      const stillClearing = c.claimClearing && st === 'R' && this.time - c.claimAt < CLEAR_GRACE;
       if (c.wait === WAIT.CONFLICT && st !== 'R') want = true;
       if (turn.movement === 'left' && c.wait === WAIT.YIELD && st === 'G' && c.yieldWait > LEFT_PATIENCE) want = true;
-      if (turn.movement === 'left' && c.yieldWait > 1 && (endOfGreen || (c.claimClearing && st === 'R' && pid !== 'PED' && pid !== 'PED_CLEAR'))) {
+      if (turn.movement === 'left' && c.yieldWait > 1 && (endOfGreen || stillClearing)) {
         want = c.wait === WAIT.CONFLICT || c.wait === WAIT.YIELD || c.wait === WAIT.RED;
         clearingClaim = want;
       }

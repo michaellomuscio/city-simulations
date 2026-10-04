@@ -172,7 +172,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, .seg button:foc
 .stats-grid dt { font-size: 11px; color: var(--ink-2); }
 .stats-grid dd { margin: 1px 0 0; font: 600 20px/1.1 var(--font-data); font-variant-numeric: tabular-nums; }
 .stats-grid small { font: 400 11px var(--font-ui); color: var(--ink-2); margin-left: 3px; }
-.spark { display: block; width: 100%; height: 54px; }
+.spark { display: block; width: 100%; height: 64px; }
+.key { display: inline-block; width: 10px; height: 0; margin: 0 5px 3px 0; vertical-align: middle; border-top: 2px solid var(--lane); }
+.key-plan { margin-left: 8px; border-top: 2px dashed var(--ink-2); }
 .spark-foot { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
 /* --- Dock -------------------------------------------------------------------------- */

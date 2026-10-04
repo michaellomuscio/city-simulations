@@ -48,6 +48,11 @@ export class World {
     for (let i = 0; i < 200; i++) this.physicsStep(PHYSICS_DT);
   }
 
+  /** Vehicles the city expects on its streets at a given hour (the demand curve). */
+  expectedCars(hour) {
+    return CAPACITY[this.size].cars * this.trafficDensity * trafficLevel(hour, this.clock.weekend);
+  }
+
   updateTargets() {
     const cap = CAPACITY[this.size];
     const h = this.clock.hour;
