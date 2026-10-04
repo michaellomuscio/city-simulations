@@ -2,6 +2,8 @@
 
 A living city in 3D, generated from a seed and simulated in the browser. Streets, a river with bridges, a central park and a skyline are laid out procedurally. Cars obey traffic signals, yield on left turns and wait for pedestrians. People walk the sidewalks and cross with the green. A day passes in twelve minutes, with lit windows at night, streetlights, headlights and changing weather.
 
+**[Live demo](https://michaellomuscio.github.io/city-simulations/)**
+
 ## Run it
 
 No build step and no dependencies. Three.js loads from a CDN.
@@ -13,6 +15,8 @@ python3 -m http.server 5173
 ```
 
 Open the page in a browser with WebGL 2 (any recent Chrome, Edge, Firefox or Safari). The module scripts need to be served over HTTP; opening `index.html` straight from disk won't work.
+
+The live demo is GitHub Pages serving `main` as-is. The empty `.nojekyll` file tells Pages to skip its Jekyll build.
 
 ## What's simulated
 
