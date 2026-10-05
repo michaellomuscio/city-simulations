@@ -83,14 +83,15 @@ export class PeopleView {
     this.colors = new Map();
   }
 
-  update() {
+  /** @param {number} alpha interpolation between the last two physics steps */
+  update(alpha = 1) {
     const a = this.mesh.instanceMatrix.array;
     const col = this.mesh.instanceColor.array;
     const anim = this.anim.array;
     const look = this.look.array;
     let i = 0;
     for (const p of this.peds.peds) {
-      this.peds.pose(p, this.pose);
+      this.peds.drawPose(p, alpha, this.pose);
       const { x, z, dx, dz } = this.pose;
       const e = p.edge;
       // Crosswalks are at road level, a curb step below the sidewalk.

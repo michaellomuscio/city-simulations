@@ -62,6 +62,8 @@ export class Traffic {
     this.typeWeights = TYPE_NAMES.map((t) => VEHICLE_TYPES[t].weight);
     this._a = { x: 0, z: 0, dx: 0, dz: 0 };
     this._b = { x: 0, z: 0, dx: 0, dz: 0 };
+    this._p = { x: 0, z: 0, dx: 0, dz: 0 };
+    this.snapId = 0;
   }
 
   setTarget(n) {
@@ -84,7 +86,11 @@ export class Traffic {
   step(dt) {
     this.time += dt;
     const cars = this.cars;
-    for (let i = 0; i < cars.length; i++) cars[i].acc = this.accel(cars[i]);
+    for (let i = 0; i < cars.length; i++) {
+      const c = cars[i];
+      if (c.pinned) this.keepInCity(c);
+      c.acc = this.accel(c);
+    }
     for (let i = 0; i < cars.length; i++) this.move(cars[i], dt);
     let w = 0;
     let leaving = 0;
@@ -470,10 +476,16 @@ export class Traffic {
 
   chooseTurn(c, lane) {
     if (lane.to.portal || !lane.outTurns.length) return null;
-    const moves = new Set(lane.outTurns.map((t) => t.movement));
+    let turns = lane.outTurns;
+    // A car someone is watching or driving stays in the city instead of leaving on a highway.
+    if (c.pinned) {
+      const inside = turns.filter((t) => !t.toLane.to.portal);
+      if (inside.length) turns = inside;
+    }
+    const moves = new Set(turns.map((t) => t.movement));
     let m = c.plannedMove;
     if (!m || !moves.has(m)) m = this.pickMove(moves);
-    const options = lane.outTurns.filter((t) => t.movement === m);
+    const options = turns.filter((t) => t.movement === m);
     // Plan one road ahead so the car ends up in a lane that allows its next move.
     const nextMoves = new Set();
     for (const t of options) for (const u of t.toLane.outTurns) nextMoves.add(u.movement);
@@ -485,6 +497,14 @@ export class Traffic {
     if (keep.length && this.rng.next() < 0.85) good = keep;
     c.plannedMove = next;
     return good[Math.floor(this.rng.next() * good.length)];
+  }
+
+  /** Re-plan once per lane if a watched car was headed out of town and hasn't committed yet. */
+  keepInCity(c) {
+    if (c.replanned === c.seg || c.seg.kind !== 'lane' || c.committed || !c.nextTurn || !c.nextTurn.toLane.to.portal) return;
+    c.replanned = c.seg;
+    if (c.claim) this.releaseClaim(c);
+    c.nextTurn = this.chooseTurn(c, c.seg);
   }
 
   // --- Lifecycle ----------------------------------------------------------------
@@ -640,6 +660,35 @@ export class Traffic {
     out.z = (A.z + B.z) / 2;
     out.dx = dx;
     out.dz = dz;
+    return out;
+  }
+
+  /** Remember every car's pose, so frames drawn between physics steps can interpolate. */
+  snapshot() {
+    this.snapId++;
+    const p = this._p;
+    for (const c of this.cars) {
+      this.pose(c, p);
+      c.px = p.x;
+      c.pz = p.z;
+      c.pdx = p.dx;
+      c.pdz = p.dz;
+      c.snap = this.snapId;
+    }
+  }
+
+  /** Pose to draw: `alpha` of the way from the last snapshot to where the car is now. */
+  drawPose(c, alpha, out) {
+    this.pose(c, out);
+    if (c.snap !== this.snapId || alpha >= 1) return out;
+    const k = 1 - alpha;
+    out.x += (c.px - out.x) * k;
+    out.z += (c.pz - out.z) * k;
+    const dx = out.dx + (c.pdx - out.dx) * k;
+    const dz = out.dz + (c.pdz - out.dz) * k;
+    const l = Math.hypot(dx, dz) || 1;
+    out.dx = dx / l;
+    out.dz = dz / l;
     return out;
   }
 

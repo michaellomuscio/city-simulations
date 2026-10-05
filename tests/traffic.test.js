@@ -70,3 +70,47 @@ test('left-turners yield to oncoming traffic that is not stopping', () => {
   });
   assert.ok(yields > 0, 'nobody ever yielded');
 });
+
+test('moving cars are drawn smoothly between physics steps', () => {
+  const w = new World({ seed: 5, size: 'small', hour: 11 });
+  const tr = w.traffic;
+  const watched = tr.cars.filter((c) => c.v > 5).slice(0, 40);
+  const pose = { x: 0, z: 0, dx: 1, dz: 0 };
+  const last = new Map();
+  const moved = new Map();
+  let worst = 0;
+  // A 60 Hz display draws three frames for every physics step.
+  for (let f = 0; f < 600; f++) {
+    w.update(1 / 60, 1);
+    for (const c of watched) {
+      if (c.dead) continue;
+      tr.drawPose(c, w.alpha, pose);
+      const p = last.get(c);
+      if (p) {
+        const d = Math.hypot(pose.x - p.x, pose.z - p.z);
+        if (moved.has(c)) worst = Math.max(worst, Math.abs(d - moved.get(c)));
+        moved.set(c, d);
+      }
+      last.set(c, { x: pose.x, z: pose.z });
+    }
+  }
+  // Drawn straight from the physics state, a car at 10 m/s would jump half a meter
+  // every third frame and stand still in between.
+  assert.ok(worst < 0.1, `movement between frames changed by up to ${worst.toFixed(3)} m`);
+});
+
+test('a car someone is watching or driving stays in the city', () => {
+  const headedOut = (pin) => {
+    const w = new World({ seed: 11, size: 'small', hour: 9 });
+    const tr = w.traffic;
+    const cars = tr.cars.filter((c) => c.seg.kind === 'lane' && !c.committed && c.nextTurn && !c.nextTurn.toLane.to.portal).slice(0, 40);
+    for (const c of cars) c.pinned = pin;
+    const out = new Set();
+    run(w, 300, () => {
+      for (const c of cars) if (c.seg.kind === 'lane' && c.seg.to.portal) out.add(c);
+    });
+    return out.size;
+  };
+  assert.ok(headedOut(false) > 0, 'expected some unwatched cars to leave town');
+  assert.equal(headedOut(true), 0, 'a watched car took a highway out of town');
+});

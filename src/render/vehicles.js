@@ -192,9 +192,22 @@ export class VehicleView {
       body.castShadow = true;
       trim.castShadow = true;
       body.receiveShadow = true;
-      this.types[type] = { body, trim, lights, state, n: 0 };
+      this.types[type] = { body, trim, lights, state, n: 0, geo };
       this.group.add(body, trim, lights);
     }
+    // The car being driven is drawn on its own: the painted body shows as a hood, while
+    // glass, cab panels and lights would sit in front of the driver's eye, so they only
+    // cast their shadow.
+    this.cab = new THREE.Group();
+    this.cab.visible = false;
+    // Satin rather than gloss: seen this close, a low sun would glare off the hood.
+    this.cabBody = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0.2 }));
+    this.cabBody.castShadow = true;
+    this.cabBody.receiveShadow = true;
+    this.cabTrim = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    this.cabTrim.castShadow = true;
+    this.cab.add(this.cabBody, this.cabTrim);
+    this.group.add(this.cab);
     // Headlight beams on the road surface.
     this.beamMat = new THREE.MeshBasicMaterial({ map: beamTexture(), color: 0xfff1d6, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
     const beamGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0.5, 0, 0);
@@ -208,18 +221,29 @@ export class VehicleView {
     this.color = new THREE.Color();
   }
 
-  update(night) {
+  /**
+   * @param {number} night how far the lights are on (0..1)
+   * @param {number} alpha interpolation between the last two physics steps
+   * @param {object|null} driven the car whose driver's seat the camera is in
+   */
+  update(night, alpha = 1, driven = null) {
     const tr = this.traffic;
     for (const type of TYPE_NAMES) this.types[type].n = 0;
     const beams = this.beams.instanceMatrix.array;
     let nb = 0;
     const showBeams = night > 0.05;
+    this.cab.visible = false;
     for (const c of tr.cars) {
-      const T = this.types[c.type];
-      const i = T.n++;
-      tr.pose(c, this.pose);
+      tr.drawPose(c, alpha, this.pose);
       const { x, z, dx, dz } = this.pose;
       const k = c.fade < 1 ? 0.25 + 0.75 * c.fade * c.fade * (3 - 2 * c.fade) : 1;
+      if (c === driven) {
+        this.placeCab(c, x, z, dx, dz, k);
+        if (showBeams && k > 0.9) nb = this.placeBeam(beams, nb, c, x, z, dx, dz);
+        continue;
+      }
+      const T = this.types[c.type];
+      const i = T.n++;
       const a = T.body.instanceMatrix.array;
       const o = i * 16;
       a[o] = dx * k; a[o + 1] = 0; a[o + 2] = dz * k; a[o + 3] = 0;
@@ -241,18 +265,7 @@ export class VehicleView {
       else if (turn && turn.movement === 'right') signal = 1;
       T.state.array[i * 2] = c.brake;
       T.state.array[i * 2 + 1] = signal;
-      if (showBeams && k > 0.9) {
-        const len = c.type === 'bus' || c.type === 'truck' ? 22 : 17;
-        const wid = c.wid * 3.6;
-        const b = nb * 16;
-        const fx = x + dx * c.len * 0.5;
-        const fz = z + dz * c.len * 0.5;
-        beams[b] = dx * len; beams[b + 1] = 0; beams[b + 2] = dz * len; beams[b + 3] = 0;
-        beams[b + 4] = 0; beams[b + 5] = 1; beams[b + 6] = 0; beams[b + 7] = 0;
-        beams[b + 8] = -dz * wid; beams[b + 9] = 0; beams[b + 10] = dx * wid; beams[b + 11] = 0;
-        beams[b + 12] = fx; beams[b + 13] = 0.06; beams[b + 14] = fz; beams[b + 15] = 1;
-        nb++;
-      }
+      if (showBeams && k > 0.9) nb = this.placeBeam(beams, nb, c, x, z, dx, dz);
     }
     for (const type of TYPE_NAMES) {
       const T = this.types[type];
@@ -266,5 +279,30 @@ export class VehicleView {
     this.beams.count = nb;
     this.beams.instanceMatrix.needsUpdate = true;
     this.beamMat.opacity = night * 0.3;
+  }
+
+  /** Headlight pool on the road ahead of a car. Returns the new beam count. */
+  placeBeam(beams, nb, c, x, z, dx, dz) {
+    const len = c.type === 'bus' || c.type === 'truck' ? 22 : 17;
+    const wid = c.wid * 3.6;
+    const b = nb * 16;
+    const fx = x + dx * c.len * 0.5;
+    const fz = z + dz * c.len * 0.5;
+    beams[b] = dx * len; beams[b + 1] = 0; beams[b + 2] = dz * len; beams[b + 3] = 0;
+    beams[b + 4] = 0; beams[b + 5] = 1; beams[b + 6] = 0; beams[b + 7] = 0;
+    beams[b + 8] = -dz * wid; beams[b + 9] = 0; beams[b + 10] = dx * wid; beams[b + 11] = 0;
+    beams[b + 12] = fx; beams[b + 13] = 0.06; beams[b + 14] = fz; beams[b + 15] = 1;
+    return nb + 1;
+  }
+
+  placeCab(c, x, z, dx, dz, k) {
+    const { geo } = this.types[c.type];
+    this.cabBody.geometry = geo.body;
+    this.cabTrim.geometry = geo.trim;
+    this.cabBody.material.color.set(c.color);
+    this.cab.position.set(x, 0, z);
+    this.cab.rotation.y = Math.atan2(-dz, dx);
+    this.cab.scale.setScalar(k);
+    this.cab.visible = true;
   }
 }

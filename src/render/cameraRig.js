@@ -7,6 +7,18 @@ import { clamp } from '../sim/constants.js';
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
+// Driver's eye for each vehicle, from the car's center: forward, left, and up (meters).
+// Each sits just behind the windshield, inside the cab.
+const EYE = {
+  sedan: { fwd: 0.35, left: 0.37, up: 1.22 },
+  taxi: { fwd: 0.4, left: 0.37, up: 1.22 },
+  hatch: { fwd: 0.05, left: 0.35, up: 1.24 },
+  suv: { fwd: 0.75, left: 0.42, up: 1.45 },
+  van: { fwd: 1.4, left: 0.42, up: 1.75 },
+  truck: { fwd: 2.8, left: 0.5, up: 2.25 },
+  bus: { fwd: 4.8, left: 0.55, up: 2.3 },
+};
+
 export class CameraRig {
   constructor(camera, dom) {
     this.camera = camera;
@@ -35,7 +47,7 @@ export class CameraRig {
     this.onModeChange = () => {};
     this._pose = { x: 0, z: 0, dx: 1, dz: 0 };
     this._last = new THREE.Vector3();
-    this._dir = new THREE.Vector3(1, 0, 0);
+    this.alpha = 1;
 
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
@@ -125,7 +137,7 @@ export class CameraRig {
 
   follow(car, traffic) {
     this.setMode('follow', car);
-    traffic.pose(car, this._pose);
+    traffic.drawPose(car, this.alpha, this._pose);
     const p = new THREE.Vector3(this._pose.x, 1.5, this._pose.z);
     this._last.copy(p);
     const back = new THREE.Vector3(-this._pose.dx, 0, -this._pose.dz);
@@ -141,12 +153,22 @@ export class CameraRig {
     this.setMode('orbit');
   }
 
-  update(dt, traffic) {
+  /**
+   * @param {number} dt wall-clock seconds since the last frame
+   * @param {number} alpha interpolation between the last two physics steps
+   */
+  update(dt, traffic, alpha = 1) {
     const c = this.controls;
     const cam = this.camera;
+    this.alpha = alpha;
     if (this.car && (this.car.dead || !traffic.cars.includes(this.car))) {
-      // The car left the city or faded out.
+      // The car left the city or faded out. From the driver's seat, rise to look down on where it was.
+      const fromSeat = this.mode === 'drive';
       this.setMode('orbit');
+      if (fromSeat) {
+        const at = new THREE.Vector3(this._pose.x, 0, this._pose.z);
+        this.flyTo(at, at.clone().add(new THREE.Vector3(-this._pose.dx * 50, 38, -this._pose.dz * 50)), 1.4);
+      }
     }
 
     if (this.mode === 'tour' && this.downtown) {
@@ -162,7 +184,7 @@ export class CameraRig {
     }
 
     if ((this.mode === 'follow' || this.mode === 'drive') && this.car) {
-      traffic.pose(this.car, this._pose);
+      traffic.drawPose(this.car, alpha, this._pose);
       const p = new THREE.Vector3(this._pose.x, 1.5, this._pose.z);
       if (this.mode === 'follow') {
         const delta = p.clone().sub(this._last);
@@ -175,12 +197,11 @@ export class CameraRig {
           this.flight.toP.add(delta);
         }
       } else {
-        // Driver's seat: smooth the heading so turns feel natural.
-        this._dir.lerp(new THREE.Vector3(this._pose.dx, 0, this._pose.dz), 1 - Math.exp(-dt * 6)).normalize();
-        const eye = this.car.type === 'bus' ? 2.6 : this.car.type === 'truck' ? 2.5 : this.car.type === 'van' ? 1.9 : 1.25;
-        const fwd = this.car.len * (this.car.type === 'bus' ? 0.42 : 0.08);
-        cam.position.set(p.x + this._dir.x * fwd - this._dir.z * -0.35, eye, p.z + this._dir.z * fwd + this._dir.x * -0.35);
-        c.target.set(cam.position.x + this._dir.x * 30, eye - 1.2, cam.position.z + this._dir.z * 30);
+        // Driver's seat: fixed in the cab, so the view moves exactly with the car.
+        const e = EYE[this.car.type] || EYE.sedan;
+        const { dx, dz } = this._pose;
+        cam.position.set(p.x + dx * e.fwd + dz * e.left, e.up, p.z + dz * e.fwd - dx * e.left);
+        c.target.set(cam.position.x + dx * 30, e.up - 1.1, cam.position.z + dz * 30);
         cam.lookAt(c.target);
       }
       this._last.copy(p);
@@ -248,7 +269,7 @@ export class CameraRig {
     if (cam.position.y < 1.2) cam.position.y = 1.2;
 
     // Push the near plane out when far away, for depth precision on road paint.
-    const near = this.mode === 'drive' ? 0.15 : clamp(Math.min(this.distance, cam.position.y) * 0.02, 0.25, 25);
+    const near = this.mode === 'drive' ? 0.3 : clamp(Math.min(this.distance, cam.position.y) * 0.02, 0.25, 25);
     if (Math.abs(cam.near - near) > near * 0.1) {
       cam.near = near;
       cam.updateProjectionMatrix();

@@ -294,7 +294,8 @@ class App {
       if (!down || !this.world) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       if (moved < 6 && performance.now() - down.t < 500) {
-        const hit = this.picker.pick(e.clientX, e.clientY, this.world);
+        const seat = this.rig.mode === 'drive' ? this.rig.car : null;
+        const hit = this.picker.pick(e.clientX, e.clientY, this.world, seat);
         this.select(hit);
       }
       down = null;
@@ -333,7 +334,7 @@ class App {
       m.box.scale.set(b.x1 - b.x0 + 1.5, b.y1 + 1, b.z1 - b.z0 + 1.5);
     } else if (s.kind === 'car') {
       if (this.rig.mode === 'drive') return;
-      this.world.traffic.pose(s.car, m.pose);
+      this.world.traffic.drawPose(s.car, this.world.alpha, m.pose);
       m.ring.visible = true;
       const r = s.car.len * 0.75;
       m.ring.position.set(m.pose.x, 0.08, m.pose.z);
@@ -379,8 +380,10 @@ class App {
     this.stage.renderer.toneMappingExposure = k.exposure * (1 + wx.flash * 0.5);
     this.stage.bloom.strength = 0.1 + lightsOn * 0.32;
 
-    v.vehicles.update(lightsOn);
-    v.people.update();
+    // Draw moving things part way between physics steps so motion stays smooth at any frame rate.
+    const alpha = w.alpha;
+    v.vehicles.update(lightsOn, alpha, this.rig.mode === 'drive' ? this.rig.car : null);
+    v.people.update(alpha);
     v.signals.update(t);
     v.lights.update(lightsOn);
     v.beacons.update(t, night);
@@ -389,7 +392,7 @@ class App {
     this.rain.update(t, this.stage.camera, wx.rain, wx.wind, night);
 
     // The camera runs on wall-clock time so moves finish on time even at low frame rates.
-    this.rig.update(raw, w.traffic);
+    this.rig.update(raw, w.traffic, alpha);
     this.atmos.followCamera(this.stage.camera);
     this.updateMarker();
     this.hud.frame(dt);

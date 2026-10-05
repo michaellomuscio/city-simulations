@@ -44,8 +44,12 @@ export class World {
     this.updateTargets();
     this.traffic.populate(Math.round(this.traffic.target * 0.92));
     this.peds.populate(Math.round(this.peds.target * 0.95));
-    // Let queues form at signals before the first frame.
-    for (let i = 0; i < 200; i++) this.physicsStep(PHYSICS_DT);
+    // Let queues form at signals before the first frame, ending with a snapshot so
+    // drawing can interpolate from the start.
+    for (let i = 0; i < 200; i++) {
+      if (i === 199) this.snapshot();
+      this.physicsStep(PHYSICS_DT);
+    }
   }
 
   /** Vehicles the city expects on its streets at a given hour (the demand curve). */
@@ -68,6 +72,17 @@ export class World {
     this.simTime += dt;
   }
 
+  /** Remember where everyone is, so frames drawn between physics steps can interpolate. */
+  snapshot() {
+    this.traffic.snapshot();
+    this.peds.snapshot();
+  }
+
+  /** How far time has run past the last physics step, as a fraction of a step. */
+  get alpha() {
+    return Math.min(1, this.accumulator / PHYSICS_DT);
+  }
+
   /** Advance by `realDt` seconds of wall time at `speed`x. Returns the number of physics steps taken. */
   update(realDt, speed) {
     const dt = Math.min(realDt, 0.1) * speed;
@@ -82,6 +97,9 @@ export class World {
     this.accumulator += dt;
     let steps = 0;
     while (this.accumulator >= PHYSICS_DT && steps < MAX_STEPS) {
+      // Physics runs 20 times a second; frames in between are drawn part way from
+      // the state before this frame's last step to the state after it.
+      if (this.accumulator < PHYSICS_DT * 2 || steps === MAX_STEPS - 1) this.snapshot();
       this.physicsStep(PHYSICS_DT);
       this.accumulator -= PHYSICS_DT;
       steps++;

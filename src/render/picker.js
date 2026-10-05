@@ -15,7 +15,8 @@ export class Picker {
     this.pose = { x: 0, z: 0, dx: 1, dz: 0 };
   }
 
-  pick(clientX, clientY, world) {
+  /** @param {object|null} skip a car to ignore (the one the camera sits in) */
+  pick(clientX, clientY, world, skip = null) {
     const rect = this.dom.getBoundingClientRect();
     this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
@@ -28,7 +29,8 @@ export class Picker {
 
     // Vehicles: slab test in each car's local frame, slightly inflated so small cars are easy to hit.
     for (const c of world.traffic.cars) {
-      world.traffic.pose(c, this.pose);
+      if (c === skip) continue;
+      world.traffic.drawPose(c, world.alpha, this.pose);
       const { x, z, dx, dz } = this.pose;
       const ox = o.x - x;
       const oz = o.z - z;

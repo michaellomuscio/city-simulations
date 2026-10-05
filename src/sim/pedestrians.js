@@ -23,6 +23,8 @@ export class Pedestrians {
     this.nextId = 1;
     this.leaving = 0;
     this.walkable = net.pedEdges.filter((e) => e.kind === 'sidewalk' && e.length > 8);
+    this.snapId = 0;
+    this._p = { x: 0, z: 0, dx: 0, dz: 0 };
   }
 
   setTarget(n) {
@@ -199,6 +201,35 @@ export class Pedestrians {
     out.z = z;
     out.dx = dx;
     out.dz = dz;
+    return out;
+  }
+
+  /** Remember every walker's pose, so frames drawn between physics steps can interpolate. */
+  snapshot() {
+    this.snapId++;
+    const q = this._p;
+    for (const p of this.peds) {
+      this.pose(p, q);
+      p.px = q.x;
+      p.pz = q.z;
+      p.pdx = q.dx;
+      p.pdz = q.dz;
+      p.snap = this.snapId;
+    }
+  }
+
+  /** Pose to draw: `alpha` of the way from the last snapshot to where the walker is now. */
+  drawPose(p, alpha, out) {
+    this.pose(p, out);
+    if (p.snap !== this.snapId || alpha >= 1) return out;
+    const k = 1 - alpha;
+    out.x += (p.px - out.x) * k;
+    out.z += (p.pz - out.z) * k;
+    const dx = out.dx + (p.pdx - out.dx) * k;
+    const dz = out.dz + (p.pdz - out.dz) * k;
+    const l = Math.hypot(dx, dz) || 1;
+    out.dx = dx / l;
+    out.dz = dz / l;
     return out;
   }
 
